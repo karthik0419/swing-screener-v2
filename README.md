@@ -33,7 +33,7 @@ The screener started as a pattern detection tool for Indian swing trading. The i
 
 ---
 
-### v5.0 — 2026-05-07 (Current)
+### v5.0 — 2026-05-07
 **What we rebuilt and why:**
 
 **1. Switched data source: yfinance → jugaad-data (NSE native)**
@@ -81,6 +81,54 @@ The screener started as a pattern detection tool for Indian swing trading. The i
 
 ---
 
+### v6.0 — 2026-05-08 (Current — this repo: swing-screener-v2)
+**New patterns added, v1 repo kept frozen.**
+
+This is a separate local repo (`swing-screener-v2`) built on top of v5. All v5 code is intact — only new patterns were added on top.
+
+**Why a new repo?** v1 was working well and giving real setups. Rather than risk breaking it, v2 was forked locally to add the new pattern layer independently.
+
+**9. Break & Retest (`patterns/break_retest.py`)**
+- Detects stocks that broke above a key resistance with volume, then pulled back to retest it
+- Classic institutional re-entry setup — breakout confirms the level, retest gives the entry
+- Logic: resistance = 40-bar high before breakout; breakout = close above + volume > 1.3x avg; retest = pull back within 3% of that level
+- Stop = post-breakout low * 0.98; Target = measured move from base
+
+**10. Ascending & Symmetrical Triangle (`patterns/triangle.py`)**
+- Ascending Triangle: 3 peaks within 2.5% of each other (flat resistance) + rising lows → breakout pending
+- Symmetrical Triangle: lower highs + higher lows converging → compression coiling for a move
+- Both require at least 3 valid swing points and minimum 30 bars to form
+- Stop = triangle low; Target = base of triangle projected upward
+
+**11. S&R Horizontal Levels (`patterns/sr_levels.py`)**
+- Finds horizontal price zones that have been touched 3+ times in the last 60 bars
+- Nearby zones (within 1.5%) are merged to avoid duplicates
+- Two setups: S&R Support (price above level, buying retest) and S&R Breakout (price below level, buying push through)
+- Must be within 4% of the nearest level to qualify
+
+**12. Descending Channel Breakout (`patterns/channel.py`)**
+- Identifies descending channels using numpy polyfit on swing highs and lows
+- Both trendlines must be negative slope and roughly parallel (slope ratio 0.4–2.5)
+- Breakout confirmed when current price is above the upper channel line (but not more than 8% above — can't chase)
+- Target = channel height projected above breakout; Stop = just below upper channel line
+- Inspired by SHAKTIPUMP's setup — long downtrend in channel, then clean break above upper line
+
+**Updated pattern scoring and priority order:**
+```
+Weekly C&H (40) > Daily C&H (35) > Break & Retest (33) > Channel Breakout (32) >
+Ascending Triangle (30) > Symmetrical Triangle (28) > Darvas Box (28) >
+S&R Support (25) > S&R Breakout (25) > Flag/Pennant (25) > Breakout (20)
+```
+
+**C&H threshold adjustments (also backported):**
+- `min_depth` lowered 15% → 12% (catches real-world shallower cups like BAJAJ-AUTO area)
+- `max_depth` raised 50% → 60% (catches deeper corrections)
+- `near_pct` raised 5% → 8% (wider entry window)
+- Handle depth limit raised from `cup*0.50` to `cup*0.65`
+- U-shape check widened from middle 60% to middle 80% (bottom allowed in 10%–90% range)
+
+---
+
 ## How to Run
 
 Double-click `run_screener.bat`
@@ -109,12 +157,12 @@ pip install pandas numpy jugaad-data
 ## Project Structure
 
 ```
-enhanced-swing-trading-screener/
+swing-screener-v2/
 ├── run_screener.bat          # One-click manual runner
-├── may_screener.py           # Main swing screener
+├── may_screener.py           # Main swing screener (9 patterns)
 ├── stock_universe.py         # Dynamic universe builder
 ├── backtest.py               # Backtester CLI
-├── backbone50.txt            # 48 curated stocks (always scanned)
+├── backbone50.txt            # 52 curated stocks (always scanned)
 ├── nifty500.txt              # 233-stock full universe
 │
 ├── data/
@@ -125,7 +173,11 @@ enhanced-swing-trading-screener/
 │   ├── cup_handle.py         # Cup & Handle — daily + weekly
 │   ├── breakout.py           # Resistance breakout
 │   ├── darvas_box.py         # Darvas Box
-│   └── flags.py              # Flag / Pennant
+│   ├── flags.py              # Flag / Pennant
+│   ├── break_retest.py       # Break & Retest (v6 new)
+│   ├── triangle.py           # Ascending + Symmetrical Triangle (v6 new)
+│   ├── sr_levels.py          # S&R Horizontal Levels (v6 new)
+│   └── channel.py            # Descending Channel Breakout (v6 new)
 │
 ├── backtester/
 │   ├── engine.py             # Walk-forward engine
@@ -143,7 +195,7 @@ enhanced-swing-trading-screener/
 
 | Factor | Max | Logic |
 |--------|-----|-------|
-| Pattern quality | 40 | Weekly C&H=40, Daily C&H=35, Darvas=28, Flag=25, Breakout=20 |
+| Pattern quality | 40 | Weekly C&H=40, Daily C&H=35, Break&Retest=33, Channel=32, AscTri=30, SymTri/Darvas=28, S&R/Flag=25, Breakout=20 |
 | RSI zone | 20 | 45-65 healthy = 20pts, 35-45 recovering = 12pts, >65 overbought = 8pts |
 | Relative strength vs Nifty | 15 | RS +5% = 15pts, RS +2% = 10pts, RS +0% = 5pts |
 | Near 52-week high | 15 | Within 5% = 15pts, within 10% = 10pts, within 15% = 5pts |
