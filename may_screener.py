@@ -24,6 +24,8 @@ from patterns.darvas_box import detect_darvas_box
 from patterns.flags import detect_flag_pennant
 from patterns.break_retest import detect_break_retest
 from patterns.triangle import detect_triangle
+from patterns.sr_levels import detect_sr_levels
+from patterns.channel import detect_descending_channel
 
 
 # ──────────────────────────────────────────────
@@ -100,9 +102,11 @@ def analyse_stock(symbol, df=None, df_nifty=None):
         detect_cup_handle_weekly(df_weekly) or
         detect_cup_handle(df) or
         detect_break_retest(df) or
+        detect_descending_channel(df) or
         detect_triangle(df) or
         detect_darvas_box(df) or
         detect_flag_pennant(df) or
+        detect_sr_levels(df) or
         detect_breakout(df)
     )
 
@@ -127,9 +131,12 @@ def analyse_stock(symbol, df=None, df_nifty=None):
         "Cup & Handle (Weekly)": 40,
         "Cup & Handle":          35,
         "Break & Retest":        33,
+        "Channel Breakout":      32,
         "Ascending Triangle":    30,
         "Symmetrical Triangle":  28,
         "Darvas Box":            28,
+        "S&R Support":           25,
+        "S&R Breakout":          25,
         "Bullish Flag":          25,
         "Bullish Pennant":       25,
         "Resistance Breakout":   20,
