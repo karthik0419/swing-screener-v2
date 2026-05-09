@@ -1,5 +1,5 @@
 @echo off
-cd /d "C:\Users\91814\Desktop\claude\enhanced-swing-trading-screener"
+cd /d "C:\Users\91814\Desktop\claude\swing-screener-v2"
 
 echo ============================================
 echo   SWING SCREENER — Manual Run
@@ -17,7 +17,7 @@ if errorlevel 1 (
 
 echo.
 echo [2/2] Running swing screener on today's universe...
-python may_screener.py --stocks today_universe.txt --top 15 --min-score 30 --output daily_results.csv
+python may_screener.py --stocks today_universe.txt --top 15 --min-score 30
 if errorlevel 1 (
     echo ERROR: may_screener.py failed.
     pause
@@ -27,7 +27,7 @@ if errorlevel 1 (
 echo.
 echo ============================================
 echo   Done at %date% %time%
-echo   Results saved to: daily_results.csv
+echo   Results saved to: results_%date:~-4%-%date:~3,2%-%date:~0,2%.csv
 echo ============================================
 echo %date% %time% — Screener completed >> screener_log.txt
 
