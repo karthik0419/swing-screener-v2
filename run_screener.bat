@@ -8,7 +8,7 @@ echo ============================================
 
 echo.
 echo [1/2] Building today's universe from nifty500...
-python stock_universe.py --top 80
+python stock_universe.py --top 200
 if errorlevel 1 (
     echo ERROR: stock_universe.py failed. Check nifty500.txt exists.
     pause

@@ -15,34 +15,40 @@ def _nse_symbol(symbol):
 
 
 def _fetch_nse(symbol, days=180):
-    """Fetch daily OHLCV from NSE via jugaad-data."""
+    """Fetch daily OHLCV from NSE via jugaad-data, with yfinance fallback."""
     sym = _nse_symbol(symbol)
     to_dt = date.today()
     from_dt = to_dt - timedelta(days=days)
+    raw = None
     try:
         raw = nse_stock_df(symbol=sym, from_date=from_dt, to_date=to_dt, series="EQ")
     except Exception as e:
         print(f"  [NSE] fetch failed for {sym}: {e}")
-        return None
 
-    if raw is None or raw.empty:
-        return None
+    if raw is not None and not raw.empty:
+        raw = raw.rename(columns={
+            "DATE": "Date", "OPEN": "Open", "HIGH": "High",
+            "LOW": "Low", "CLOSE": "Close", "VOLUME": "Volume",
+        })
+        raw["Date"] = pd.to_datetime(raw["Date"]).dt.tz_localize(None).dt.normalize()
+        raw = raw.set_index("Date").sort_index()
+        cols = [c for c in ["Open", "High", "Low", "Close", "Volume"] if c in raw.columns]
+        return raw[cols].dropna()
 
-    raw = raw.rename(columns={
-        "DATE": "Date",
-        "OPEN": "Open",
-        "HIGH": "High",
-        "LOW": "Low",
-        "CLOSE": "Close",
-        "VOLUME": "Volume",
-    })
+    # Fallback: yfinance
+    try:
+        import yfinance as yf
+        yf_sym = symbol if symbol.endswith(".NS") else sym + ".NS"
+        period_map = {180: "6mo", 400: "2y", 730: "3y"}
+        period = period_map.get(days) or ("2y" if days <= 400 else "5y")
+        df = yf.download(yf_sym, period=period, interval="1d", progress=False, auto_adjust=True)
+        if df is not None and not df.empty:
+            df.index = pd.to_datetime(df.index).tz_localize(None).normalize()
+            return df[["Open", "High", "Low", "Close", "Volume"]].dropna()
+    except Exception:
+        pass
 
-    raw["Date"] = pd.to_datetime(raw["Date"]).dt.tz_localize(None).dt.normalize()
-    raw = raw.set_index("Date").sort_index()
-
-    cols = [c for c in ["Open", "High", "Low", "Close", "Volume"] if c in raw.columns]
-    df = raw[cols].dropna()
-    return df
+    return None
 
 
 def _resample_weekly(df_daily):

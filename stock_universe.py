@@ -120,7 +120,7 @@ def main():
             if s not in backbone:
                 f.write(s + "\n")
 
-    print(f"\nUniverse built: {len(final)} stocks → saved to {args.output}")
+    print(f"\nUniverse built: {len(final)} stocks -> saved to {args.output}")
     print(f"Top 10 momentum picks today:")
     for sym, sc in universe_scored[:10]:
         print(f"  {sym:20s} score={sc}")
