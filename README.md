@@ -81,7 +81,11 @@ The screener started as a pattern detection tool for Indian swing trading. The i
 
 ---
 
-### v6.0 — 2026-05-08 (Current — this repo: swing-screener-v2)
+### v6.1 — 2026-05-10
+- Updated `backbone50.txt` with latest curated stock list (62 stocks)
+- Daily results saved with date suffix (`daily_results_YYYY-MM-DD.csv`) to prevent overwriting
+
+### v6.0 — 2026-05-08 (this repo: swing-screener-v2)
 **New patterns added, v1 repo kept frozen.**
 
 This is a separate local repo (`swing-screener-v2`) built on top of v5. All v5 code is intact — only new patterns were added on top.
