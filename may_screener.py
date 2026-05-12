@@ -250,6 +250,7 @@ def main():
     args = parser.parse_args()
 
     symbols = args.symbols if args.symbols else load_stocks(args.stocks)
+    symbols = list(dict.fromkeys(symbols))  # remove duplicates, preserve order
     if not symbols:
         print("No symbols. Use --symbols or a stocks file.")
         sys.exit(1)
