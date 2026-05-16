@@ -1,30 +1,28 @@
 import pandas as pd
 import numpy as np
 
-from data.loader import _fetch_nse
+from data.loader import _fetch_nse, _resample_weekly
 from patterns.breakout import detect_breakout
-from patterns.retest import detect_retest
-from patterns.compression import detect_compression
-from patterns.cup_handle import detect_cup_handle
-from patterns.double_top_bottom import detect_double_top, detect_double_bottom
+from patterns.cup_handle import detect_cup_handle, detect_cup_handle_weekly
+from patterns.break_retest import detect_break_retest
+from patterns.channel import detect_descending_channel
+from patterns.triangle import detect_triangle
 from patterns.darvas_box import detect_darvas_box
-from patterns.flags import detect_flag_pennant, detect_pennant
-from utils.pattern_validator import validate_pattern_quality
-from utils.target_calculator import calculate_advanced_targets
-from scoring.scorer import score_setup
+from patterns.flags import detect_flag_pennant
+from patterns.sr_levels import detect_sr_levels
 from config.settings import MIN_CANDLES
 
-# Pattern priority order — mirrors scanner.py
+# Pattern priority order — matches may_screener.py exactly
 DETECTORS = [
-    detect_cup_handle,
-    detect_double_bottom,
-    detect_double_top,
-    detect_darvas_box,
-    detect_flag_pennant,
-    detect_pennant,
-    detect_retest,
-    detect_compression,
-    detect_breakout,
+    ("weekly_ch", detect_cup_handle_weekly),
+    ("daily_ch",  detect_cup_handle),
+    ("retest",    detect_break_retest),
+    ("channel",   detect_descending_channel),
+    ("triangle",  detect_triangle),
+    ("darvas",    detect_darvas_box),
+    ("flag",      detect_flag_pennant),
+    ("sr",        detect_sr_levels),
+    ("breakout",  detect_breakout),
 ]
 
 MAX_HOLD_DAYS = 30
@@ -35,9 +33,10 @@ def _fetch_history(symbol, years):
 
 
 def _detect_signal(df_slice):
-    for detect in DETECTORS:
+    df_weekly = _resample_weekly(df_slice)
+    for name, detect in DETECTORS:
         try:
-            result = detect(df_slice)
+            result = detect(df_weekly) if name == "weekly_ch" else detect(df_slice)
             if result:
                 return result
         except Exception:
@@ -46,39 +45,36 @@ def _detect_signal(df_slice):
 
 
 def _enrich_signal(df_slice, result):
-    try:
-        advanced = calculate_advanced_targets(df_slice, result["pattern"], result)
-        result.update({
-            "target1": advanced["targets"][0] if len(advanced["targets"]) > 0 else result["target"],
-            "target2": advanced["targets"][1] if len(advanced["targets"]) > 1 else result["target"],
-            "target3": advanced["targets"][2] if len(advanced["targets"]) > 2 else result["target"],
-            "stop_loss": advanced["stop_loss"],
-            "atr": advanced.get("atr", 0),
-        })
-    except Exception:
-        result.setdefault("target1", result.get("target", 0))
-        result.setdefault("target2", result.get("target", 0))
-        result.setdefault("target3", result.get("target", 0))
-        result.setdefault("atr", 0)
+    cmp = float(df_slice["Close"].iloc[-1])
+    breakout = result.get("breakout", cmp)
+    stop = result.get("stop_loss", cmp * 0.97)
+    target = result.get("target", cmp * 1.10)
 
-    try:
-        is_valid, val_score, _ = validate_pattern_quality(df_slice, result["pattern"], result)
-        if not is_valid:
-            return None
-        result["validation_score"] = val_score
-    except Exception:
-        result["validation_score"] = 0
+    risk = cmp - stop
+    reward = target - cmp
+    rr = round(reward / risk, 2) if risk > 0 else 0
 
-    try:
-        score, rr, upside, risk = score_setup(result)
-        if rr == 0 or risk <= 0:
-            return None
-        result["score"] = round(score, 2)
-        result["rr"] = round(rr, 2)
-    except Exception:
-        result["score"] = 0
-        result["rr"] = 0
+    if rr < 1.0 or risk <= 0:
+        return None
 
+    # Use same scoring as may_screener.py
+    pattern = result.get("pattern", "")
+    pattern_scores = {
+        "Cup & Handle (Weekly)": 40, "Cup & Handle": 35,
+        "Break & Retest": 33, "Channel Breakout": 32,
+        "Ascending Triangle": 30, "Symmetrical Triangle": 28,
+        "Darvas Box": 28, "S&R Support": 25, "S&R Breakout": 25,
+        "Bullish Flag": 25, "Bullish Pennant": 25, "Resistance Breakout": 20,
+    }
+    score = pattern_scores.get(pattern, 10)
+    score += 10 if rr >= 2.5 else (5 if rr >= 1.5 else 0)
+
+    result["score"] = score
+    result["rr"] = rr
+    result["target1"] = target
+    result["target2"] = round(cmp + reward * 1.3, 2)
+    result["target3"] = round(cmp + reward * 1.6, 2)
+    result["stop_loss"] = stop
     return result
 
 
